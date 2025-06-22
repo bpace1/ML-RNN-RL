@@ -1,88 +1,86 @@
+# nn_agent.py
+
 from agentes.base import Agent
 import numpy as np
 import tensorflow as tf
+import random
+from typing import List, Any, Dict
 
-model_path = 'models/flappy_q_nn_model.keras'
+DEFAULT_MODEL_PATH = 'models/flappy_q_nn_model.keras'
 
 class NNAgent(Agent):
     """
-    Agente que utiliza una red neuronal entrenada para aproximar la Q-table.
-    La red debe estar guardada como TensorFlow SavedModel.
+    DQN-based Agent for Flappy Bird that uses a pretrained neural network to approximate Q-values.
+    Supports optional epsilon-greedy exploration during training.
     """
-    def __init__(self, actions, game=None, model_path=model_path):
+
+    def __init__(
+        self,
+        actions: List[Any],
+        game: Any = None,
+        model_path: str = DEFAULT_MODEL_PATH,
+        epsilon: float = 0.1,
+        min_epsilon: float = 0.01,
+        decay_rate: float = 0.995
+    ):
+        """
+        :param actions: list of possible actions
+        :param game:       reference to the game environment (optional)
+        :param model_path: path to the saved TensorFlow model
+        :param epsilon:    initial exploration probability
+        :param min_epsilon:minimum exploration probability
+        :param decay_rate: rate at which epsilon decays after each action
+        """
         super().__init__(actions, game)
-        
-        self.model = tf.keras.models.load_model(model_path)
-    
-    def _discretize_state(self, state):
-        """Convierte el estado continuo en características discretas"""
-        player_y = state['player_y']
-        pipe_top_y = state['next_pipe_top_y']
-        pipe_bottom_y = state['next_pipe_bottom_y']
-        pipe_center_y = (pipe_bottom_y - pipe_top_y) / 2 + pipe_top_y
-        
-        # Discretizar posición vertical del jugador (0-3)
-        if player_y < pipe_top_y:
-            player_y_bin = 0    # Por encima del tubo superior
-        elif player_y > pipe_bottom_y:
-            player_y_bin = 1    # Por debajo del tubo inferior
-        else:
-            if player_y < pipe_center_y:    
-                player_y_bin = 2    # Entre tubos, cerca del superior
-            else:
-                player_y_bin = 3    # Entre tubos, cerca del inferior
-        
-        # Discretizar velocidad del jugador (-2 a 2)
-        player_vel = state['player_vel']
-        if player_vel > 8:
-            player_vel_bin = -2   # Muy rápido descendiendo
-        elif player_vel > 3:
-            player_vel_bin = -1   # Rápido descendiendo
-        elif player_vel > -3:
-            player_vel_bin = 0    # Estable
-        elif player_vel > -8:
-            player_vel_bin = 1    # Rápido ascendiendo
-        else:
-            player_vel_bin = 2    # Muy rápido ascendiendo
-            
-        return np.array([player_y_bin, player_vel_bin], dtype=np.float32)
+        # Cargar el modelo entrenado
+        self.model: tf.keras.Model = tf.keras.models.load_model(model_path)
+        # Parámetros de exploración
+        self.epsilon = epsilon
+        self.min_epsilon = min_epsilon
+        self.decay_rate = decay_rate
 
+    def _extract_features(self, state: Dict[str, float]) -> np.ndarray:
+        """
+        Convierte el estado crudo en un vector de características continuas para la red.
+        En lugar de discretizar, utilizamos:
+          - delta_y: distancia vertical del jugador al centro del próximo tubo
+          - player_vel: velocidad actual del jugador
 
-    
-    def act(self, state):
+        :param state: diccionario con llaves 'player_y', 'next_pipe_top_y', 'next_pipe_bottom_y', 'player_vel'
+        :return: np.array de shape (2,) dtype float32
         """
-        COMPLETAR: Implementar la función de acción.
-        Debe transformar el estado al formato de entrada de la red y devolver la acción con mayor Q.
-        """
-        #print(state)
         player_y = state['player_y']
-        pipe_bottom_y = state['next_pipe_bottom_y']
-        pipe_top_y = state['next_pipe_top_y']
-        pipe_center_y = (pipe_bottom_y - pipe_top_y) / 2 + pipe_top_y
-        player_y_bin = 0  # Inicializar variable de discretización de la posición del jugador
-        if player_y < pipe_top_y:
-            player_y_bin = 0    # Por encima del tubo superior
-        elif player_y > pipe_bottom_y:
-            player_y_bin = 1    # Por debajo del tubo inferior
-        elif player_y > pipe_top_y and player_y < pipe_bottom_y:
-            if player_y < pipe_center_y:    
-                player_y_bin = 2    # Entre los tubos, más cerca del tubo superior
-            else:
-                player_y_bin = 3    # Entre los tubos, más cerca del tubo inferior
+        top_y = state['next_pipe_top_y']
+        bot_y = state['next_pipe_bottom_y']
+        pipe_center = (top_y + bot_y) / 2.0
+        delta_y = player_y - pipe_center
         player_vel = state['player_vel']
-        
-        if player_vel > 8:
-            player_vel_bin = -2   # Muy rápido descendiendo
-        elif player_vel > 3:
-            player_vel_bin = -1   # Rápido descendiendo
-        elif player_vel > -3:
-            player_vel_bin = 0    # Estable
-        elif player_vel > -8:
-            player_vel_bin = 1    # Rápido ascendiendo
+        return np.array([delta_y, player_vel], dtype=np.float32)
+
+    def act(self, state: Dict[str, float], training: bool = False) -> Any:
+        """
+        Elige una acción dado el estado actual.
+        - Si training=True, aplica epsilon-greedy.
+        - En modo evaluación, siempre aprovecha la Q máxima.
+
+        :param state:    estado actual del juego
+        :param training: si es True, permite exploración aleatoria
+        :return:         acción seleccionada de self.actions
+        """
+        features = self._extract_features(state)
+        # Formatear batch de tamaño 1
+        batch = np.expand_dims(features, axis=0)
+
+        # Epsilon-greedy
+        if training and random.random() < self.epsilon:
+            action = random.choice(self.actions)
         else:
-            player_vel_bin = 2    # Muy rápido ascendiendo
-        action_prob = self.model.predict(np.array([player_y_bin,player_vel_bin],), verbose=0)
-        print(action_prob)
-        predicted_action_idx = np.argmax(action_prob)
-       
-        return self.actions[predicted_action_idx]
+            q_values = self.model.predict(batch, verbose=0)[0]
+            idx = int(np.argmax(q_values))
+            action = self.actions[idx]
+
+        # Decaer epsilon tras cada paso de entrenamiento
+        if training:
+            self.epsilon = max(self.min_epsilon, self.epsilon * self.decay_rate)
+
+        return action

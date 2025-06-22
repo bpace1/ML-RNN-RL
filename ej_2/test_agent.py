@@ -51,13 +51,17 @@ if hasattr(agent, 'load_q_table') and args.qtable:
         sys.exit(1)
 
 # Agente con acciones aleatorias
+iteracion: int = 0
 while True:
+    iteracion += 1
+    print(f'Iteracion: {iteracion}')
     env.reset_game()
     agent.reset()
     state_dict = env.getGameState()
     done = False
     total_reward_episode = 0
     print("\n--- Ejecutando agente ---")
+    
     while not done:
         action = agent.act(state_dict)
         reward = env.act(action)

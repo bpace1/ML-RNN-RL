@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
+import os
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
+from tensorflow.keras import layers, regularizers
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle as shuffle_data
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -11,7 +12,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 # Configuración de rutas y parámetros
 MODEL_SAVE_PATH = 'models/flappy_q_nn_model.keras'  # Cambiado a formato .keras
 NUM_ACTIONS = 2
-EPOCHS = 200
+EPOCHS = 500
 VALIDATION_SPLIT = 0.2
 RANDOM_STATE = 42
 
@@ -35,24 +36,50 @@ X_train, X_val, y_train, y_val = train_test_split(
 )
 
 # --- Definir modelo ---
-model = keras.Sequential([
+from tensorflow.keras import regularizers
+from tensorflow.keras import layers, Sequential
+
+# Modelo mejorado con BatchNormalization, Dropout y esquema de bloques
+model = Sequential([
     layers.Input(shape=(X.shape[1],)),
-    layers.Dense(128, activation='relu'),
-    layers.Dropout(0.3),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(64, activation='relu'),
-    layers.Dropout(0.3),
-    layers.Dense(32, activation='relu'),
-    layers.Dense(16, activation='relu'),
-    layers.Dense(NUM_ACTIONS)
+
+    layers.Dense(256),
+    layers.BatchNormalization(),
+    layers.Activation('elu'),
+    layers.Dense(256),
+    layers.BatchNormalization(),
+    layers.Activation('elu'),
+    layers.Dropout(0.2),
+
+    layers.Dense(128),
+    layers.BatchNormalization(),
+    layers.Activation('elu'),
+    layers.Dense(128),
+    layers.BatchNormalization(),
+    layers.Activation('elu'),
+    layers.Dropout(0.2),
+
+    layers.Dense(64),
+    layers.BatchNormalization(),
+    layers.Activation('elu'),
+    layers.Dense(64),
+    layers.BatchNormalization(),
+    layers.Activation('elu'),
+    layers.Dropout(0.2),
+
+    layers.Dense(32),
+    layers.Dense(16),
+    layers.Dense(NUM_ACTIONS, activation='linear')
 ])
+
+model.summary()
+
 
 # Compilar con configuración explícita para evitar problemas de serialización
 model.compile(
     optimizer=keras.optimizers.Adam(learning_rate=0.001),
     loss=keras.losses.MeanSquaredError(),  # Usando la clase en lugar del string
-    metrics=[keras.metrics.MeanAbsoluteError()]  # Usando la clase
+    metrics=[keras.metrics.MeanAbsoluteError()],
 )
 
 # Callback para guardar el mejor modelo
@@ -61,39 +88,44 @@ checkpoint = ModelCheckpoint(
     monitor='val_loss',
     verbose=1,
     save_best_only=True,
-    mode='min'
+    mode='min',
 )
 
 # --- Entrenamiento ---
 history = model.fit(
     X_train, y_train,
-    batch_size=32,
+    batch_size=16,
     epochs=EPOCHS,
     validation_data=(X_val, y_val),
     callbacks=[checkpoint],
-    verbose=1
+    verbose=1,
+    shuffle=True
 )
 
-# --- Visualización ---
-plt.figure(figsize=(12, 5))
-plt.subplot(1, 2, 1)
+output_dir = 'models/output'
+os.makedirs(output_dir, exist_ok=True)
+
+plt.figure(figsize=(6, 5))
 plt.plot(history.history['loss'], label='Training Loss')
 plt.plot(history.history['val_loss'], label='Validation Loss')
 plt.title('Model Loss Progression')
-plt.ylabel('Loss (MSE)')
 plt.xlabel('Epoch')
+plt.ylabel('Loss (MSE)')
 plt.legend()
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, 'training.png'))
+plt.close()
 
-plt.subplot(1, 2, 2)
+plt.figure(figsize=(6, 5))
 plt.plot(history.history['mean_absolute_error'], label='Training MAE')
 plt.plot(history.history['val_mean_absolute_error'], label='Validation MAE')
 plt.title('Model MAE Progression')
-plt.ylabel('MAE')
 plt.xlabel('Epoch')
+plt.ylabel('MAE')
 plt.legend()
-
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(output_dir, 'mae.png'))
+plt.close()
 
 # --- Guardar y evaluar ---
 # Guardar modelo final
