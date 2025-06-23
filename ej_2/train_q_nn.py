@@ -4,7 +4,7 @@ import pickle
 import os
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers, regularizers
+from tensorflow.keras import layers, regularizers, Sequential
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle as shuffle_data
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -35,11 +35,8 @@ X_train, X_val, y_train, y_val = train_test_split(
     random_state=RANDOM_STATE
 )
 
-# --- Definir modelo ---
-from tensorflow.keras import regularizers
-from tensorflow.keras import layers, Sequential
 
-# Modelo mejorado con BatchNormalization, Dropout y esquema de bloques
+
 model = Sequential([
     layers.Input(shape=(X.shape[1],)),
 
@@ -75,23 +72,20 @@ model = Sequential([
 model.summary()
 
 
-# Compilar con configuración explícita para evitar problemas de serialización
 model.compile(
     optimizer=keras.optimizers.Adam(learning_rate=0.001),
-    loss=keras.losses.MeanSquaredError(),  # Usando la clase en lugar del string
+    loss=keras.losses.MeanSquaredError(),  
     metrics=[keras.metrics.MeanAbsoluteError()],
 )
 
-# Callback para guardar el mejor modelo
 checkpoint = ModelCheckpoint(
-    'models/best_model.keras',  # Formato .keras
+    'models/best_model.keras',  
     monitor='val_loss',
     verbose=1,
     save_best_only=True,
     mode='min',
 )
 
-# --- Entrenamiento ---
 history = model.fit(
     X_train, y_train,
     batch_size=16,

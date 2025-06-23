@@ -33,7 +33,6 @@ class QAgent(Agent):
     def discretize_state(self, state):
         """
         Discretiza el estado continuo en un estado discreto (tupla).
-        COMPLETAR: Implementar la discretización adecuada para el entorno.
         """
 
         # ---- Discretización de la Posición del Jugador ----        
@@ -88,18 +87,8 @@ class QAgent(Agent):
     def act(self, state):
         """
         Elige una acción usando epsilon-greedy sobre la Q-table.
-        COMPLETAR: Implementar la política epsilon-greedy.
         """
-        # Sugerencia:
-        # - Discretizar el estado
-        # - Con probabilidad epsilon elegir acción aleatoria
-        # - Si no, elegir acción con mayor Q-value
-        #raise NotImplementedError("Completar la función de selección de acción (act)")
-
-        """
-        Elige una acción usando epsilon-greedy sobre la Q-table.
-        """
-
+      
         discrete_state = self.discretize_state(state)
 
         if random.random() < self.epsilon:
