@@ -37,8 +37,8 @@
 - **Comparación con QAgent**: puntuaciones similares; vuelo más suave sin oscilaciones.  
 - **Métricas visuales**:
 
-![Training Loss](ej_2/models/output/training.png)  
-![Training MAE](ej_2/models/output/mae.png)
+![Training Loss](models/output/training.png)  
+![Training MAE](models/output/mae.png)
 
 ---
 
